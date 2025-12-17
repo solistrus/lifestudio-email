@@ -9,8 +9,11 @@ const DESKTOP_W = 700;
 const MOBILE_W = 390;
 const FRAME_H = 900;
 
-function isMode(val: string | null): val is Mode {
-  return val === 'all' || val === 'desktop' || val === 'mobile';
+// На узких экранах "all" (две колонки) выглядит плохо — делаем как Stripo: один экран.
+const NARROW_BREAKPOINT_PX = 900;
+
+function isMode(v: string | null): v is Mode {
+  return v === 'all' || v === 'desktop' || v === 'mobile';
 }
 
 function Frame({ src, width }: { src: string; width: number }) {
@@ -47,30 +50,64 @@ function Frame({ src, width }: { src: string; width: number }) {
 export default function PreviewByIdPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const params = useParams<{ id: string }>();
   const id = params?.id;
 
   const [mode, setMode] = useState<Mode>('all');
+  const [isNarrow, setIsNarrow] = useState(false);
 
   const src = useMemo(() => (id ? `/emails/${id}.html` : ''), [id]);
 
+  // 1) Отслеживаем узкий экран (телефон/планшет, поворот)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${NARROW_BREAKPOINT_PX}px)`);
+
+    const apply = () => setIsNarrow(mq.matches);
+    apply();
+
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', apply);
+      return () => mq.removeEventListener('change', apply);
+    }
+
+    // Safari старые
+    // eslint-disable-next-line deprecation/deprecation
+    mq.addListener(apply);
+    // eslint-disable-next-line deprecation/deprecation
+    return () => mq.removeListener(apply);
+  }, []);
+
+  // 2) На входе читаем ?view=
+  //    Если view нет — дефолт зависит от ширины:
+  //    - узкий экран => mobile
+  //    - широкий => all
   useEffect(() => {
     const view = searchParams.get('view');
-    if (isMode(view)) setMode(view);
-  }, [searchParams]);
 
+    if (isMode(view)) {
+      setMode(view);
+      return;
+    }
+
+    setMode(isNarrow ? 'mobile' : 'all');
+  }, [searchParams, isNarrow]);
+
+  // 3) Клик по переключателям: меняем режим + обновляем URL
   const setModeAndUrl = (nextMode: Mode) => {
-    setMode(nextMode);
+    // На узком экране "all" бессмысленен — показываем mobile
+    const effective: Mode = isNarrow && nextMode === 'all' ? 'mobile' : nextMode;
+
+    setMode(effective);
 
     const sp = new URLSearchParams(searchParams.toString());
-    sp.set('view', nextMode);
-
+    sp.set('view', effective);
     router.replace(`?${sp.toString()}`, { scroll: false });
   };
 
   const Pill = ({ value, label }: { value: Mode; label: string }) => {
-    const active = mode === value;
+    // Чтобы подсветка кнопок была логичной на телефоне
+    const effectiveValue: Mode = isNarrow && value === 'all' ? 'mobile' : value;
+    const active = mode === effectiveValue;
 
     return (
       <button
@@ -84,7 +121,9 @@ export default function PreviewByIdPage() {
           cursor: 'pointer',
           fontWeight: 600,
           boxShadow: active ? '0 0 0 3px rgba(220,20,110,.18)' : 'none',
+          opacity: isNarrow && value === 'all' ? 0.6 : 1,
         }}
+        title={isNarrow && value === 'all' ? 'На телефоне показываем один вариант' : undefined}
       >
         {label}
       </button>
@@ -92,11 +131,18 @@ export default function PreviewByIdPage() {
   };
 
   if (!id) {
-    return <div style={{ padding: 16 }}>Нет id в URL. Обнови страницу.</div>;
+    return (
+      <div style={{ minHeight: '100vh', background: '#f3f4f6', padding: 16 }}>
+        Нет id в URL. Открой: <code>/preview/test</code>
+      </div>
+    );
   }
 
+  // 4) На узком экране "all" рендерим как "mobile"
+  const renderMode: Mode = isNarrow && mode === 'all' ? 'mobile' : mode;
+
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', background: '#f3f4f6' }}>
       <div
         style={{
           position: 'sticky',
@@ -114,13 +160,14 @@ export default function PreviewByIdPage() {
         <Pill value="all" label="All" />
         <Pill value="desktop" label="Desktop" />
         <Pill value="mobile" label="Mobile" />
+
         <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: 12 }}>
           {src}
         </span>
       </div>
 
       <div style={{ padding: 16 }}>
-        {mode === 'all' && (
+        {renderMode === 'all' && (
           <div
             style={{
               display: 'grid',
@@ -191,13 +238,13 @@ export default function PreviewByIdPage() {
           </div>
         )}
 
-        {mode === 'desktop' && (
+        {renderMode === 'desktop' && (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <Frame src={src} width={DESKTOP_W} />
           </div>
         )}
 
-        {mode === 'mobile' && (
+        {renderMode === 'mobile' && (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <Frame src={src} width={MOBILE_W} />
           </div>
