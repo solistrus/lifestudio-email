@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 type Mode = 'all' | 'desktop' | 'mobile';
 
@@ -38,7 +38,6 @@ function Frame({ src, width }: { src: string; width: number }) {
           display: 'block',
         }}
         src={src}
-        // ✅ чтобы ссылки (https/mailto/tel) открывались в новой вкладке/приложении
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         referrerPolicy="no-referrer-when-downgrade"
         loading="lazy"
@@ -50,13 +49,34 @@ function Frame({ src, width }: { src: string; width: number }) {
 export default function PreviewByIdPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+
   const params = useParams<{ id: string }>();
   const id = params?.id;
+
+  // clientMode: если URL публичный (/p/...)
+  const clientMode = useMemo(() => (pathname ? pathname.startsWith('/p/') : false), [pathname]);
+
+  // ключ для доступа к /preview (если его нет — считаем, что это клиент и надо увести на /p/)
+  const key = searchParams.get('key');
 
   const [mode, setMode] = useState<Mode>('all');
   const [isNarrow, setIsNarrow] = useState(false);
 
   const src = useMemo(() => (id ? `/emails/${id}.html` : ''), [id]);
+
+  // ✅ РЕДИРЕКТ: если пользователь открыл /preview/[id] без ключа — уводим на /p/[id]
+  useEffect(() => {
+    if (!pathname || !id) return;
+
+    const isPreviewRoute = pathname.startsWith('/preview/');
+    if (isPreviewRoute && !key) {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.delete('key'); // на всякий случай
+      const qs = sp.toString();
+      router.replace(`/p/${id}${qs ? `?${qs}` : ''}`);
+    }
+  }, [pathname, id, key, router, searchParams]);
 
   // 1) Отслеживаем узкий экран (телефон/планшет, поворот)
   useEffect(() => {
@@ -78,9 +98,9 @@ export default function PreviewByIdPage() {
   }, []);
 
   // 2) На входе читаем ?view=
-  //    Если view нет — дефолт зависит от ширины:
-  //    - узкий экран => mobile
-  //    - широкий => all
+  //    Если view нет — дефолт зависит от ширины и режима:
+  //    - clientMode (/p/...) => desktop (или mobile на узком)
+  //    - workMode (/preview/...) => all (или mobile на узком)
   useEffect(() => {
     const view = searchParams.get('view');
 
@@ -89,8 +109,13 @@ export default function PreviewByIdPage() {
       return;
     }
 
+    if (clientMode) {
+      setMode(isNarrow ? 'mobile' : 'desktop');
+      return;
+    }
+
     setMode(isNarrow ? 'mobile' : 'all');
-  }, [searchParams, isNarrow]);
+  }, [searchParams, isNarrow, clientMode]);
 
   // 3) Клик по переключателям: меняем режим + обновляем URL
   const setModeAndUrl = (nextMode: Mode) => {
@@ -133,7 +158,7 @@ export default function PreviewByIdPage() {
   if (!id) {
     return (
       <div style={{ minHeight: '100vh', background: '#f3f4f6', padding: 16 }}>
-        Нет id в URL. Открой: <code>/preview/test</code>
+        Нет id в URL. Открой: <code>/p/test</code>
       </div>
     );
   }
@@ -156,14 +181,14 @@ export default function PreviewByIdPage() {
           zIndex: 10,
         }}
       >
-        <strong style={{ marginRight: 8 }}>Preview:</strong>
+        <strong style={{ marginRight: 8 }}>{clientMode ? 'Email viewer' : 'Preview:'}</strong>
         <Pill value="all" label="All" />
         <Pill value="desktop" label="Desktop" />
         <Pill value="mobile" label="Mobile" />
 
-        <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: 12 }}>
-          {src}
-        </span>
+        {!clientMode && (
+          <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: 12 }}>{src}</span>
+        )}
       </div>
 
       <div style={{ padding: 16 }}>
