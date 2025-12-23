@@ -1,0 +1,7 @@
+{
+  "title": "{{FILENAME}}",
+  "project": "LS",
+  "status": "draft",
+  "can_show_client": false,
+  "created_at": "{{DATE}}"
+}
