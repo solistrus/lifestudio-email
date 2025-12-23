@@ -1,13 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import CopyButton from './CopyButton';
+import PreviewClient from './PreviewClient';
 
 type Status = 'draft' | 'approved' | 'sent';
 type StatusFilter = 'all' | Status;
 
-type EmailMeta = {
+export type EmailMeta = {
   title: string;
   project: string;
   status: Status;
@@ -15,7 +14,7 @@ type EmailMeta = {
   created_at: string; // YYYY-MM-DD
 };
 
-type EmailItem = {
+export type EmailItem = {
   slug: string;
   htmlPath: string; // /emails/x.html
   meta?: EmailMeta;
@@ -83,201 +82,37 @@ function getEmails(): EmailItem[] {
   });
 }
 
-function StatusBadge({ status }: { status: Status }) {
-  const cfg =
-    status === 'draft'
-      ? { bg: '#f1f5f9', bd: '#e2e8f0', fg: '#0f172a', label: 'draft' }
-      : status === 'approved'
-      ? { bg: 'rgba(34,197,94,.10)', bd: 'rgba(34,197,94,.35)', fg: '#14532d', label: 'approved' }
-      : { bg: 'rgba(59,130,246,.10)', bd: 'rgba(59,130,246,.35)', fg: '#1e3a8a', label: 'sent' };
-
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '4px 10px',
-        borderRadius: 999,
-        background: cfg.bg,
-        border: `1px solid ${cfg.bd}`,
-        color: cfg.fg,
-        fontSize: 12,
-        fontWeight: 700,
-        lineHeight: 1,
-        textTransform: 'uppercase',
-        letterSpacing: '.04em',
-      }}
-    >
-      {cfg.label}
-    </span>
-  );
-}
-
-function BoolPill({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '4px 10px',
-        borderRadius: 999,
-        border: `1px solid ${ok ? 'rgba(34,197,94,.35)' : '#e5e7eb'}`,
-        background: ok ? 'rgba(34,197,94,.08)' : '#fff',
-        color: ok ? '#14532d' : '#475569',
-        fontSize: 12,
-        fontWeight: 700,
-      }}
-      title={ok ? 'Можно показывать клиенту' : 'Не для клиента'}
-    >
-      {label}: {ok ? 'yes' : 'no'}
-    </span>
-  );
-}
-
-function Card({ item }: { item: EmailItem }) {
-  const { slug, htmlPath, meta } = item;
-
-  // Публичный URL для клиента
-  const publicPath = `/p/${slug}`;
-
-  // Абсолютные ссылки для Copy (если задан BASE_URL)
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || '';
-  const baseForCopy = baseUrl ? `${baseUrl}${publicPath}` : publicPath;
-
-  const title = meta?.title ?? slug;
-  const project = meta?.project ?? '—';
-  const status: Status = meta?.status ?? 'draft';
-  const canShow = meta?.can_show_client ?? false;
-  const createdAt = meta?.created_at ?? '—';
-
-  return (
-    <div
-      style={{
-        background: '#fff',
-        border: '1px solid #e5e7eb',
-        borderRadius: 14,
-        padding: 14,
-        display: 'grid',
-        gap: 10,
-      }}
-    >
-      {/* header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{title}</div>
-
-        <StatusBadge status={status} />
-
-        <span style={{ color: '#64748b', fontSize: 12 }}>
-          project: <b style={{ color: '#0f172a' }}>{project}</b>
-        </span>
-
-        <span style={{ color: '#64748b', fontSize: 12 }}>
-          created: <b style={{ color: '#0f172a' }}>{createdAt}</b>
-        </span>
-
-        <div style={{ marginLeft: 'auto', fontSize: 12, color: '#64748b' }}>{htmlPath}</div>
-      </div>
-
-      {/* flags + actions */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-        <BoolPill ok={canShow} label="client" />
-
-        <span style={{ width: 1, height: 20, background: '#e5e7eb', margin: '0 2px' }} />
-
-        {/* ✅ ПУБЛИЧНЫЕ кнопки показываем ТОЛЬКО если can_show_client = true */}
-        {canShow ? (
-          <>
-            <Link
-              href={publicPath}
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 999,
-                padding: '6px 10px',
-                textDecoration: 'none',
-                color: '#0f172a',
-                fontWeight: 700,
-                background: '#fff',
-              }}
-              title="Публичная ссылка для клиента"
-            >
-              Open (Public)
-            </Link>
-
-            <Link
-              href={`${publicPath}?view=desktop`}
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 999,
-                padding: '6px 10px',
-                textDecoration: 'none',
-                color: '#0f172a',
-                fontWeight: 700,
-                background: '#fff',
-              }}
-            >
-              Desktop
-            </Link>
-
-            <Link
-              href={`${publicPath}?view=mobile`}
-              style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 999,
-                padding: '6px 10px',
-                textDecoration: 'none',
-                color: '#0f172a',
-                fontWeight: 700,
-                background: '#fff',
-              }}
-            >
-              Mobile
-            </Link>
-
-            <CopyButton label="Copy" url={baseForCopy} />
-            <CopyButton label="Copy (Desktop)" url={`${baseForCopy}?view=desktop`} />
-            <CopyButton label="Copy (Mobile)" url={`${baseForCopy}?view=mobile`} />
-          </>
-        ) : (
-          <span style={{ color: '#64748b', fontSize: 12, fontWeight: 700 }}>
-            Публичные ссылки скрыты (client: no)
-          </span>
-        )}
-
-        {!meta && (
-          <span style={{ color: '#b45309', fontSize: 12, fontWeight: 700 }}>
-            ⚠️ meta отсутствует
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default async function PreviewIndexPage({
   searchParams,
 }: {
-  searchParams: Promise<{ key?: string; status?: StatusFilter; client?: string }>;
+  searchParams: Promise<{ key?: string; status?: StatusFilter; client?: string; project?: string }>;
 }) {
-
   const PREVIEW_KEY = process.env.PREVIEW_KEY;
-  const { key, status: statusParam, client: clientParam } = await searchParams;
-
-  // Фильтры (дефолты)
-  // client=1 по умолчанию (только клиентские)
-  // status=all по умолчанию, но "sent" по умолчанию скрываем как архив
-  const statusFilter: StatusFilter = statusParam ?? 'all';
-  const clientOnly = clientParam !== '0';
+  const { key, status: statusParam, client: clientParam, project: projectParam } = await searchParams;
 
   // защита каталога
   if (PREVIEW_KEY && key !== PREVIEW_KEY) {
     redirect('/');
   }
 
+  const statusFilter: StatusFilter = statusParam ?? 'all';
+  const clientOnly = clientParam !== '0';
+  const projectFilter = (projectParam ?? 'all').trim();
+
   const itemsAll = getEmails();
+
+  const projects = Array.from(
+    new Set(itemsAll.map((i) => i.meta?.project ?? '—').filter((p) => p && p !== '—'))
+  ).sort((a, b) => a.localeCompare(b));
 
   const items = itemsAll.filter((item) => {
     const meta = item.meta;
+
+    // 0) проект
+    if (projectFilter !== 'all') {
+      const p = meta?.project ?? '—';
+      if (p !== projectFilter) return false;
+    }
 
     // 1) clientOnly: показываем только can_show_client=true
     if (clientOnly && !meta?.can_show_client) return false;
@@ -293,94 +128,15 @@ export default async function PreviewIndexPage({
   });
 
   return (
-    <div style={{ padding: 16 }}>
-      <div
-        style={{
-          position: 'sticky',
-          top: 0,
-          background: '#fff',
-          borderBottom: '1px solid #e5e7eb',
-          padding: '10px 12px',
-          borderRadius: 12,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          flexWrap: 'wrap',
-          zIndex: 10,
-        }}
-      >
-        <strong>LifeStudio Email · Previews</strong>
-        <span style={{ color: '#64748b', fontSize: 12 }}>писем: {items.length}</span>
-        {/* Filters */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          {(['all', 'draft', 'approved', 'sent'] as StatusFilter[]).map((s) => {
-            const active = statusFilter === s;
-
-            const sp = new URLSearchParams();
-            if (key) sp.set('key', key);
-            sp.set('client', clientOnly ? '1' : '0');
-            sp.set('status', s);
-
-            return (
-              <Link
-                key={s}
-                href={`/preview?${sp.toString()}`}
-                style={{
-                  border: `1px solid ${active ? '#dc146e' : '#e5e7eb'}`,
-                  background: '#fff',
-                  padding: '6px 10px',
-                  borderRadius: 999,
-                  textDecoration: 'none',
-                  color: '#0f172a',
-                  fontWeight: 700,
-                  boxShadow: active ? '0 0 0 3px rgba(220,20,110,.18)' : 'none',
-                }}
-              >
-                {s.toUpperCase()}
-              </Link>
-            );
-          })}
-
-          {(() => {
-            const sp = new URLSearchParams();
-            if (key) sp.set('key', key);
-            sp.set('status', statusFilter);
-            sp.set('client', clientOnly ? '0' : '1');
-
-            return (
-              <Link
-                href={`/preview?${sp.toString()}`}
-                style={{
-                  border: `1px solid ${clientOnly ? 'rgba(34,197,94,.45)' : '#e5e7eb'}`,
-                  background: clientOnly ? 'rgba(34,197,94,.08)' : '#fff',
-                  padding: '6px 10px',
-                  borderRadius: 999,
-                  textDecoration: 'none',
-                  color: clientOnly ? '#14532d' : '#0f172a',
-                  fontWeight: 800,
-                }}
-                title="Показывать только письма, разрешённые для клиента"
-              >
-                CLIENT ONLY: {clientOnly ? 'ON' : 'OFF'}
-              </Link>
-            );
-          })()}
-        </div>
-        
-        <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: 12, whiteSpace: 'nowrap' }}>
-          key: <code>{key ? 'yes' : 'no'}</code>
-        </span>
-      </div>
-
-      <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
-        {items.length === 0 ? (
-          <div style={{ color: '#64748b' }}>
-            В <code>public/emails</code> пока нет .html файлов.
-          </div>
-        ) : (
-          items.map((item) => <Card key={item.slug} item={item} />)
-        )}
-      </div>
-    </div>
+    <PreviewClient
+      items={items}
+      projects={projects}
+      keyParam={key}
+      statusFilter={statusFilter}
+      clientOnly={clientOnly}
+      projectFilter={projectFilter}
+      localToolsEnabled={process.env.NEXT_PUBLIC_LOCAL_META_TOOLS === '1'}
+      baseUrl={process.env.NEXT_PUBLIC_BASE_URL || ''}
+    />
   );
 }
