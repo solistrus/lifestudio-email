@@ -538,51 +538,52 @@ export default function PreviewClient(props: {
         </select>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          {/* Project filter */}
-          {(() => {
+
+            {/* Project filter (dropdown) */}
+            {(() => {
             const activeProject = projectFilter || 'all';
 
             const mkHref = (p: string) => {
-              const sp = new URLSearchParams();
-              if (keyParam) sp.set('key', keyParam);
-              sp.set('client', clientOnly ? '1' : '0');
-              sp.set('status', statusFilter);
-              if (p !== 'all') sp.set('project', p);
-              return `/preview?${sp.toString()}`;
+                const sp = new URLSearchParams();
+                if (keyParam) sp.set('key', keyParam);
+                sp.set('client', clientOnly ? '1' : '0');
+                sp.set('status', statusFilter);
+                if (p !== 'all') sp.set('project', p);
+                return `/preview?${sp.toString()}`;
             };
 
-            const Pill = ({ p, label }: { p: string; label: string }) => {
-              const active = activeProject === p;
-              return (
-                <Link
-                  href={mkHref(p)}
-                  style={{
-                    border: `1px solid ${active ? '#0f172a' : '#e5e7eb'}`,
-                    background: active ? 'rgba(15,23,42,.06)' : '#fff',
-                    padding: '6px 10px',
-                    borderRadius: 999,
-                    textDecoration: 'none',
-                    color: '#0f172a',
-                    fontWeight: 800,
-                    boxShadow: active ? '0 0 0 3px rgba(15,23,42,.12)' : 'none',
-                  }}
-                  title={p === 'all' ? 'Все проекты' : `Проект: ${p}`}
-                >
-                  {label}
-                </Link>
-              );
-            };
+            const options = ['all', ...projects];
 
             return (
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span style={{ color: '#64748b', fontSize: 12, fontWeight: 800 }}>project:</span>
-                <Pill p="all" label="ALL" />
-                {projects.map((p) => (
-                  <Pill key={p} p={p} label={p} />
-                ))}
-              </div>
+
+                <select
+                    value={activeProject}
+                    onChange={(e) => {
+                    const p = e.target.value;
+                    window.location.href = mkHref(p);
+                    }}
+                    style={{
+                    padding: '8px 12px',
+                    borderRadius: 999,
+                    border: '1px solid #e5e7eb',
+                    fontSize: 12,
+                    background: '#fff',
+                    fontWeight: 800,
+                    maxWidth: 240,
+                    }}
+                    title="Фильтр по проекту"
+                >
+                    {options.map((p) => (
+                    <option key={p} value={p}>
+                        {p === 'all' ? 'ALL projects' : p}
+                    </option>
+                    ))}
+                </select>
+                </div>
             );
-          })()}
+            })()}
 
           {/* Status filter */}
           {(['all', 'draft', 'approved', 'sent'] as StatusFilter[]).map((s) => {
