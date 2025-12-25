@@ -16,7 +16,15 @@ function isMode(v: string | null): v is Mode {
   return v === 'all' || v === 'desktop' || v === 'mobile';
 }
 
-function Frame({ src, width }: { src: string; width: number }) {
+function Frame({
+  src,
+  width,
+  onTitle,
+}: {
+  src: string;
+  width: number;
+  onTitle?: (t: string) => void;
+}) {
   return (
     <div
       style={{
@@ -41,6 +49,15 @@ function Frame({ src, width }: { src: string; width: number }) {
         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         referrerPolicy="no-referrer-when-downgrade"
         loading="lazy"
+        onLoad={(e) => {
+          try {
+            const doc = (e.currentTarget as HTMLIFrameElement).contentDocument;
+            const t = doc?.title?.trim();
+            if (t) onTitle?.(t);
+          } catch {
+            // Если вдруг браузер/политика не даст — молчим
+          }
+        }}
       />
     </div>
   );
@@ -62,6 +79,9 @@ export default function PreviewByIdPage() {
 
   const [mode, setMode] = useState<Mode>('all');
   const [isNarrow, setIsNarrow] = useState(false);
+
+  // ✅ ТЕМА ПИСЬМА из <title> внутри HTML (iframe)
+  const [subject, setSubject] = useState<string>('');
 
   const src = useMemo(() => (id ? `/emails/${id}.html` : ''), [id]);
 
@@ -179,9 +199,16 @@ export default function PreviewByIdPage() {
           gap: 8,
           alignItems: 'center',
           zIndex: 10,
+          flexWrap: 'wrap',
         }}
       >
         <strong style={{ marginRight: 8 }}>{clientMode ? 'Email viewer' : 'Preview:'}</strong>
+
+        {/* ✅ Тема письма из <title> */}
+        <span style={{ fontWeight: 800, color: '#0f172a' }}>{subject || id}</span>
+
+        <span style={{ width: 1, height: 18, background: '#e5e7eb', margin: '0 6px' }} />
+
         <Pill value="all" label="All" />
         <Pill value="desktop" label="Desktop" />
         <Pill value="mobile" label="Mobile" />
@@ -227,7 +254,7 @@ export default function PreviewByIdPage() {
                   justifyContent: 'center',
                 }}
               >
-                <Frame src={src} width={DESKTOP_W} />
+                <Frame src={src} width={DESKTOP_W} onTitle={setSubject} />
               </div>
             </div>
 
@@ -257,7 +284,7 @@ export default function PreviewByIdPage() {
                   justifyContent: 'center',
                 }}
               >
-                <Frame src={src} width={MOBILE_W} />
+                <Frame src={src} width={MOBILE_W} onTitle={setSubject} />
               </div>
             </div>
           </div>
@@ -265,13 +292,13 @@ export default function PreviewByIdPage() {
 
         {renderMode === 'desktop' && (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <Frame src={src} width={DESKTOP_W} />
+            <Frame src={src} width={DESKTOP_W} onTitle={setSubject} />
           </div>
         )}
 
         {renderMode === 'mobile' && (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <Frame src={src} width={MOBILE_W} />
+            <Frame src={src} width={MOBILE_W} onTitle={setSubject} />
           </div>
         )}
       </div>
